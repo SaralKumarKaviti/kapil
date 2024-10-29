@@ -16,17 +16,19 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path
-from counselor_app.views import counselor_login,manager_login,manager_dashboard_page,manager_logout,counselor_login,counselor_dashboard_page,counselor_logout,manager_logout,add_role
+#from counselor_app.views import counselor_login,manager_login,manager_dashboard_page,manager_logout,counselor_login,counselor_dashboard_page,counselor_logout,manager_logout,add_role
+from counselor_app.views import employee_login,employee_logout,employee_dashboard_page, manager_login,manager_logout,manager_dashboard_page,add_role,view_team
 
 urlpatterns = [
     path('admin/', admin.site.urls),
 
-    path('counselor-login',counselor_login,name="counselor_login"),
-    path('counselor-dashboard-page',counselor_dashboard_page,name="counselor_dashboard_page"),
-    path('counselor-logout',counselor_logout,name="counselor_logout"),
+    path('employee-login',employee_login,name="employee_login"),
+    path('employee-dashboard-page',employee_dashboard_page,name="employee_dashboard_page"),
+    path('employee-logout',employee_logout,name="employee_logout"),
 
     path('manager-login',manager_login,name="manager_login"),
     path('manager-dashboard-page',manager_dashboard_page,name="manager_dashboard_page"),
     path('add-role',add_role,name='add_role'),
+    path('view-team',view_team,name='view_team'),
     path('manager-logout',manager_logout,name="manager_logout")
 ]
