@@ -622,5 +622,30 @@ body {
 #counselor-list {
     padding-left: 20px;
 }
+/* Reduce the size of the containing div */
+/* Slightly larger container */
+.table-data.small-graph .order {
+    max-width: 600px;  /* Adjusted width */
+    margin: 0 auto;
+    padding: 20px;  /* Slightly reduced padding for a more compact feel */
+}
+
+/* Slightly larger canvas */
+canvas {
+    max-width: 400px;  /* Increased max-width for larger display */
+    max-height: 400px;  /* Increased max-height for larger display */
+    padding: 15px;
+}
+.side-by-side {
+        display: flex; /* Use flexbox to arrange children in a row */
+        justify-content: flex-start; /* Align items to the start */
+        gap: 20px; /* Add space between the headings */
+        margin-top: 10px; /* Space above the headings */
+    }
+
+    h4 {
+        margin: 0; /* Remove default margin for headings */
+    }
+
 
 
