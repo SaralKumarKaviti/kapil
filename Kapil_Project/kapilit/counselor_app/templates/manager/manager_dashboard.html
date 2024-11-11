@@ -239,9 +239,14 @@
             <div class="col">
                 <input type="text" class="form-control" name="enrollment_id" placeholder="Enrollment ID">
             </div>
+
             <div class="col">
+            	
                 <input type="text" class="form-control" name="counselor_name" placeholder="Counselor Name">
+            
             </div>
+
+            
         </div>
         <div class="row mb-3">
             <div class="col">
@@ -264,7 +269,8 @@
 								<th>Date of Enrollment</th>
 								<th>Mobile</th>
 								<th>Counselor</th>
-								<th>Payment Status</th>
+								<th>Registraion Fee Status</th>
+								<th>Course Fee Status</th>
 								<th>More</th>
 								{{ course_counts.keys}}
 							</tr>
@@ -277,14 +283,26 @@
 								<td>{{student.enrolled_on}}</td>
 								<td>{{student.mobile}}</td>
 								<td>{{student.counselor_name}}</td>
+								{% if student.reg_payment_status == "success" %}
 								<td>
 									<div class="icon-payment">
 								        <a href="" title="Payment">
-								            <i class="fa-solid fa-check fa-fade" style="color: orangered;"></i>
+								            <i class="fa-solid fa-circle-check fa-fade" style="color: green;"></i>
 								        </a>
 								    </div>	
-								</td>							
+								</td>
+								{% else %}
 								<td>
+									<div class="icon-payment">
+								        <a href="" title="Payment">
+								            <i class="fa-solid fa-circle-xmark" style="color: orangered;"></i>
+								        </a>
+								    </div>	
+								</td>
+								{% endif %}	
+								<td>--</td>						
+								<td>
+
 									<a href="" title="View" class="icon-view">
 								            <i class="fas fa-eye"></i>
 								        </a>

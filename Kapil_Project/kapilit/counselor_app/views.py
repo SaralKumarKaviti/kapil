@@ -681,10 +681,26 @@ def manager_dashboard_page(request):
 
     # Build the student query with filters
     student_query = """
-        SELECT s.first_name, s.last_name, s.enrollment_id, s.email, s.mobile, s.enrolled_on, c.name
-        FROM counselor_app_studentenrollment AS s
-        JOIN counselor_app_role AS c ON s.counselor_id = c.id
-        WHERE c.manager_id = %s AND c.role_type = 'counselor'
+        SELECT 
+            s.first_name, 
+            s.last_name, 
+            s.enrollment_id, 
+            s.email, 
+            s.mobile, 
+            s.enrolled_on, 
+            COALESCE(rpd.register_payment_status, 'Not Available') AS register_payment_status, 
+            COALESCE(rpd.payment_mode, 'Not Available') AS payment_mode, 
+            c.name AS counselor_name
+        FROM 
+            counselor_app_studentenrollment AS s
+        JOIN 
+            counselor_app_role AS c ON s.counselor_id = c.id
+        LEFT JOIN 
+            counselor_app_registrationpaymentdetails AS rpd ON s.enrollment_id = rpd.enrollment_id
+        WHERE 
+            c.manager_id = %s 
+            AND c.role_type = 'counselor'
+
     """
     params = [manager_id]
 
@@ -756,8 +772,12 @@ def manager_dashboard_page(request):
         "email": student[3],
         "mobile": student[4],
         "enrolled_on": student[5],
-        "counselor_name": student[6]
+        "reg_payment_status": student[6],
+        "payment_mode": student[7],
+        "counselor_name": student[8]
     } for sno, student in enumerate(student_data)]
+    print(student_list)
+
 
     student_enrolled_count = len(student_list)
 
