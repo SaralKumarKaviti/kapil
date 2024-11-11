@@ -17,8 +17,7 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path
 #from counselor_app.views import counselor_login,manager_login,manager_dashboard_page,manager_logout,counselor_login,counselor_dashboard_page,counselor_logout,manager_logout,add_role
-from counselor_app.views import employee_login,employee_logout,employee_dashboard_page, manager_login,manager_logout,manager_dashboard_page,add_role,view_team,add_enroll_students,edit_enrolled_student,delete_enrolled_student,view_enrolled_student,payment_enrolled_student
-
+from counselor_app.views import employee_login,employee_logout,employee_dashboard_page, manager_login,manager_logout,manager_dashboard_page,add_role,view_team,add_enroll_students,edit_enrolled_student,delete_enrolled_student,view_enrolled_student,register_payment_enrolled_student
 urlpatterns = [
     path('admin/', admin.site.urls),
 
@@ -37,5 +36,8 @@ urlpatterns = [
     path('edit-enroll-student/<int:student_id>',edit_enrolled_student,name="edit_enrolled_student"),
     path('delete-enroll-student/<int:student_id>',delete_enrolled_student,name="delete_enrolled_student"),
     path('view-enroll-student/<int:student_id>',view_enrolled_student,name="view_enrolled_student"),
-    path('payment-enroll-student/<int:student_id>',payment_enrolled_student,name="payment_enrolled_student")
+    path('register-payment-enroll-student/<int:student_id>',register_payment_enrolled_student,name="register_payment_enrolled_student"),
+    # path('download-excel/', download_excel, name='download_excel'),
+    #path('razorpay-callback/', razorpay_callback, name='razorpay_callback')
+
 ]

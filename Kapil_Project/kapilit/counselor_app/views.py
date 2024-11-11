@@ -4,6 +4,15 @@ from django.db import connection
 from django.conf import settings
 from django.contrib import messages
 import datetime
+import razorpay
+from django.views.decorators.csrf import csrf_exempt
+from django.utils import timezone
+from datetime import datetime, timedelta
+from django.core.paginator import Paginator
+import openpyxl
+from openpyxl.styles import Font
+
+
 
 def generate_enrollment_id(course_name, date):
     courses_data = {
@@ -11,7 +20,7 @@ def generate_enrollment_id(course_name, date):
         'Java Full Stack': 'KIHJA',
         'Data Science': 'KIHDS',
         'Digital Marketing': 'KIHDM',
-        'UI / UX': 'KIHUI'
+        'UI/UX': 'KIHUI'
     }
 
     data = courses_data.get(course_name, 'UNKNOWN')
@@ -51,54 +60,480 @@ def employee_login(request):
 
     return render(request, 'employee/employee_login.html')
 
+# def employee_dashboard_page(request):
+#     emp_id = request.session.get('emp_role_id')
+#     if not emp_id:
+#         return render(request, 'employee/employee_login.html')
+
+#     # Fetch employee details
+#     with connection.cursor() as cur:
+#         query = "SELECT name, email FROM counselor_app_role WHERE id = %s"
+#         cur.execute(query, [emp_id])
+#         employee_data = cur.fetchone()
+
+#     if employee_data:
+#         employee_details = {
+#             "employee_name": employee_data[0],
+#             "employee_email": employee_data[1],
+#         }
+
+#         # Updated student query with JOIN
+#         student_query = """
+#             SELECT se.id, se.first_name, se.last_name, se.email, se.mobile, 
+#                    se.course_name, se.enrolled_on, se.status, 
+#                    rp.register_payment_status 
+#             FROM counselor_app_studentenrollment se
+#             LEFT JOIN counselor_app_registrationpaymentdetails rp 
+#             ON se.id = rp.student_id
+#             WHERE se.counselor_id = %s
+#         """
+#         with connection.cursor() as cur:
+#             cur.execute(student_query, [emp_id])
+#             enrolled_students = cur.fetchall()
+
+#             student_enrollment_details = []
+#             successful_payment_count = 0
+
+#             for index, student in enumerate(enrolled_students, start=1):  # Start numbering from 1
+#                 register_payment_status = student[8]  # Get the payment status
+
+#                 # Count successful registrations
+#                 if register_payment_status == 'success':
+#                     successful_payment_count += 1
+
+#                 student_enrollment_details.append({
+#                     "s_no": index,  # Serial number
+#                     "id": student[0],
+#                     "first_name": student[1],
+#                     "last_name": student[2],
+#                     "email": student[3],
+#                     "mobile": student[4],
+#                     "course_name": student[5],
+#                     "enrolled_on": student[6],
+#                     "status": student[7],
+#                     "register_payment_status": register_payment_status,  # Payment status from registration details
+#                 })
+
+#         enrolled_student_count = len(student_enrollment_details)
+
+#         final_data = {
+#             'employee_details': employee_details,
+#             'student_enrollment_details': student_enrollment_details,
+#             'enrolled_student_count': enrolled_student_count,
+#             'successful_register_payment_count': successful_payment_count,  # Add this to the context
+#         }
+
+#     return render(request, 'employee/employee_dashboard.html', final_data)
+
+
+# def employee_dashboard_page(request):
+#     emp_id = request.session.get('emp_role_id')
+#     if not emp_id:
+#         return render(request, 'employee/employee_login.html')
+
+#     # Fetch employee details
+#     with connection.cursor() as cur:
+#         cur.execute("SELECT name, email FROM counselor_app_role WHERE id = %s", [emp_id])
+#         employee_data = cur.fetchone()
+
+#     if employee_data:
+#         employee_details = {
+#             "employee_name": employee_data[0],
+#             "employee_email": employee_data[1],
+#         }
+        
+#         # Get filtering parameters from POST
+#         course_name_filter = request.POST.get('course_name')
+#         date_filter = request.POST.get('date_filter')
+#         start_date, end_date = None, None
+
+#         # Prepare the base student query
+#         student_query = """
+#             SELECT se.id, se.first_name, se.last_name, se.email, se.mobile, 
+#                    se.course_name, se.enrolled_on, se.status, 
+#                    rp.register_payment_status 
+#             FROM counselor_app_studentenrollment se
+#             LEFT JOIN counselor_app_registrationpaymentdetails rp 
+#             ON se.id = rp.student_id
+#             WHERE se.counselor_id = %s
+#         """
+#         params = [emp_id]
+
+#         # Filter by course name if provided
+#         if course_name_filter:
+#             student_query += " AND se.course_name = %s"
+#             params.append(course_name_filter)
+
+#         # Apply date filter based on selected range
+#         today = datetime.now().date()
+#         if date_filter:
+#             if date_filter == 'today':
+#                 start_date, end_date = today, today + timedelta(days=1)
+#             elif date_filter == 'yesterday':
+#                 start_date, end_date = today - timedelta(days=1), today
+#             elif date_filter == 'last_3_days':
+#                 start_date = today - timedelta(days=3)
+#             elif date_filter == 'last_7_days':
+#                 start_date = today - timedelta(days=7)
+#             elif date_filter == 'last_month':
+#                 start_date = today - timedelta(days=30)
+#             elif date_filter == 'custom_date':
+#                 start_date = request.POST.get('start_date')
+#                 end_date = request.POST.get('end_date')
+#                 if start_date and end_date:
+#                     start_date = datetime.strptime(start_date, "%Y-%m-%d").date()
+#                     end_date = datetime.strptime(end_date, "%Y-%m-%d").date() + timedelta(days=1)
+#                 else:
+#                     messages.error(request, "Please provide both start and end dates for custom date filter.")
+#                     return render(request, 'employee/employee_dashboard.html', {'employee_details': employee_details})
+
+#             if start_date:
+#                 student_query += " AND se.enrolled_on >= %s"
+#                 params.append(start_date)
+#             if end_date:
+#                 student_query += " AND se.enrolled_on < %s"
+#                 params.append(end_date)
+
+#         # Execute the query
+#         with connection.cursor() as cur:
+#             cur.execute(student_query, params)
+#             enrolled_students = cur.fetchall()
+
+#             student_enrollment_details = []
+#             success_payment_count = 0
+#             for index, student in enumerate(enrolled_students, start=1):
+#                 register_payment_status = student[8]
+#                 if register_payment_status == "success":
+#                     success_payment_count += 1
+#                 student_enrollment_details.append({
+#                     "s_no": index,
+#                     "id": student[0],
+#                     "first_name": student[1],
+#                     "last_name": student[2],
+#                     "email": student[3],
+#                     "mobile": student[4],
+#                     "course_name": student[5],
+#                     "enrolled_on": student[6],
+#                     "status": student[7],
+#                     "register_payment_status": register_payment_status
+#                 })
+
+#         # Paginate the student enrollment details
+#         paginator = Paginator(student_enrollment_details, 3)  # Show 10 students per page
+#         page_number = request.GET.get('page')
+#         page_obj = paginator.get_page(page_number)
+
+#         enrolled_student_count = len(student_enrollment_details)
+#         final_data = {
+#             'employee_details': employee_details,
+#             'student_enrollment_details': page_obj,
+#             'enrolled_student_count': enrolled_student_count,
+#             'course_name_filter': course_name_filter,
+#             'date_filter': date_filter,
+#             'success_payment_count': success_payment_count
+#         }
+
+#     return render(request, 'employee/employee_dashboard.html', final_data)
+
+
+# import openpyxl
+# from openpyxl.styles import Font
+# from django.http import HttpResponse
+# from django.db import connection
+
+
+from datetime import datetime
+
 def employee_dashboard_page(request):
     emp_id = request.session.get('emp_role_id')
     if not emp_id:
-        return render(request,'employee/employee_login.html')
+        return render(request, 'employee/employee_login.html')
+
+    # Fetch employee details
     with connection.cursor() as cur:
-        query = "SELECT name,email FROM counselor_app_role WHERE id = %s"
-        cur.execute(query,[emp_id])
+        cur.execute("SELECT name, email FROM counselor_app_role WHERE id = %s", [emp_id])
         employee_data = cur.fetchone()
+
     if employee_data:
-        employee_details={
-            "employee_name":employee_data[0],
-            "employee_email":employee_data[1],
-            
+        employee_details = {
+            "employee_name": employee_data[0],
+            "employee_email": employee_data[1],
         }
+
+        # Get filtering parameters from POST
+        course_name_filter = request.POST.get('course_name')
+        date_filter = request.POST.get('date_filter')
+        name_filter = request.POST.get('name_filter')
+        email_filter = request.POST.get('email_filter')
+        mobile_filter = request.POST.get('mobile_filter')
+        enrollment_id_filter = request.POST.get('enrollment_id_filter')
+        
+        start_date, end_date = None, None
+
+        # Prepare the base student query
+        student_query = """
+            SELECT se.id, se.first_name, se.last_name, se.email, se.mobile, se.location,
+                   se.mode_of_attending, se.qualification, se.branch, se.course_name,
+                   se.course_amount, se.discount_amount, se.total_amount, se.gender,
+                   se.education_status, se.passed_year, se.marks, se.current_year,
+                   se.enrolled_on, se.enrollment_id, se.id AS enrolled_id, se.registration_fee, 
+                   rp.payment_mode, rp.register_payment_status, rp.paymented_on, 
+                   rp.payment_by, rp.transaction_id
+            FROM counselor_app_studentenrollment se
+            LEFT JOIN counselor_app_registrationpaymentdetails rp
+            ON se.id = rp.student_id
+            WHERE se.counselor_id = %s
+        """
+
+        params = [emp_id]
+
+        # Filter by course name if provided
+        if course_name_filter:
+            student_query += " AND se.course_name = %s"
+            params.append(course_name_filter)
+
+        # Apply date filter based on selected range
+        today = datetime.now().date()
+        if date_filter:
+            if date_filter == 'today':
+                start_date, end_date = today, today + timedelta(days=1)
+            elif date_filter == 'yesterday':
+                start_date, end_date = today - timedelta(days=1), today
+            elif date_filter == 'last_3_days':
+                start_date = today - timedelta(days=3)
+            elif date_filter == 'last_7_days':
+                start_date = today - timedelta(days=7)
+            elif date_filter == 'last_month':
+                start_date = today - timedelta(days=30)
+            elif date_filter == 'custom_date':
+                start_date = request.POST.get('start_date')
+                end_date = request.POST.get('end_date')
+                if start_date and end_date:
+                    start_date = datetime.strptime(start_date, "%Y-%m-%d").date()
+                    end_date = datetime.strptime(end_date, "%Y-%m-%d").date() + timedelta(days=1)
+                else:
+                    messages.error(request, "Please provide both start and end dates for custom date filter.")
+                    return render(request, 'employee/employee_dashboard.html', {'employee_details': employee_details})
+
+            if start_date:
+                student_query += " AND se.enrolled_on >= %s"
+                params.append(start_date)
+            if end_date:
+                student_query += " AND se.enrolled_on < %s"
+                params.append(end_date)
+
+        # Filter by name, email, mobile, and enrollment_id if provided
+        if name_filter:
+            student_query += " AND (se.first_name LIKE %s OR se.last_name LIKE %s)"
+            params.append(f"%{name_filter}%")
+            params.append(f"%{name_filter}%")
+
+        if email_filter:
+            student_query += " AND se.email LIKE %s"
+            params.append(f"%{email_filter}%")
+
+        if mobile_filter:
+            student_query += " AND se.mobile LIKE %s"
+            params.append(f"%{mobile_filter}%")
+
+        if enrollment_id_filter:
+            student_query += " AND se.enrollment_id LIKE %s"
+            params.append(f"%{enrollment_id_filter}%")
+
+        # Execute the query for student data
         with connection.cursor() as cur:
-            student_query = """
-                    SELECT id,first_name, last_name, email, mobile, course_name, enrolled_on 
-                    FROM counselor_app_studentenrollment 
-                    WHERE counselor_id = %s
-                """
-            cur.execute(student_query, [emp_id])
+            cur.execute(student_query, params)
             enrolled_students = cur.fetchall()
-            
 
             student_enrollment_details = []
-            for student in enrolled_students:
+            success_payment_count = 0
+            for index, student in enumerate(enrolled_students, start=1):
+                # Check if payment was successful and append data to student enrollment details
+                register_payment_status = student[23]
+                print(register_payment_status)
+                if register_payment_status == "success":
+                    success_payment_count += 1
                 student_enrollment_details.append({
+                    "s_no": index,
                     "id": student[0],
                     "first_name": student[1],
                     "last_name": student[2],
                     "email": student[3],
                     "mobile": student[4],
-                    "course_name": student[5],
-                    "enrolled_on": student[6],
+                    "location": student[5],
+                    "mode_of_attending": student[6],
+                    "qualification": student[7],
+                    "branch": student[8],
+                    "course_name": student[9],
+                    "course_amount": student[10],
+                    "discount_amount": student[11],
+                    "total_amount": student[12],
+                    "gender": student[13],
+                    "education_status": student[14],
+                    "passed_year": student[15],
+                    "marks": student[16],
+                    "current_year": student[17],
+                    "enrolled_on": student[18],
+                    "enrollment_id": student[19],
+                    "registration_fee": student[20],
+                    "payment_mode": student[21],
+                    "register_payment_status": register_payment_status,
+                    "paymented_on": student[23],
+                    "payment_by": student[24],
+                    "transaction_id": student[25]
                 })
 
+        # Handle download request for filtered/unfiltered data
+        if request.GET.get('download') == 'excel':
+            return download_enrollment_data(student_enrollment_details, course_name_filter, date_filter)
+
+        # Paginate results
+        paginator = Paginator(student_enrollment_details, 3)
+        page_number = request.GET.get('page')
+        page_obj = paginator.get_page(page_number)
+
         enrolled_student_count = len(student_enrollment_details)
-                
+
         final_data = {
-                'employee_details': employee_details,
-                'student_enrollment_details': student_enrollment_details,
-                'enrolled_student_count': enrolled_student_count
-            }
-        
+            'employee_details': employee_details,
+            'student_enrollment_details': page_obj,
+            'course_name_filter': course_name_filter,
+            'date_filter': date_filter,
+            'name_filter': name_filter,
+            'email_filter': email_filter,
+            'mobile_filter': mobile_filter,
+            'enrollment_id_filter': enrollment_id_filter,
+            'enrolled_student_count': enrolled_student_count,
+            'success_payment_count': success_payment_count
+        }
+
+        # Debugging output to check if success_payment_count is updated
+        print(f"Success Payment Count: {success_payment_count}")  # You can remove this once it's confirmed
+
+    return render(request, 'employee/employee_dashboard.html', final_data)
+
+
+
+def download_enrollment_data(student_enrollment_details, course_name_filter, date_filter):
+    # Headers for the Excel sheet
+    headers = [
+        "First Name", "Last Name", "Email", "Mobile", "Location", "Mode of Attending",
+        "Qualification", "Branch", "Course Name", "Course Amount", "Discount Amount",
+        "Total Amount", "Gender", "Education Status", "Passed Year", "Marks",
+        "Current Year", "Enrolled On", "Enrollment ID", "Registration Fee",
+        "Payment Mode", "Register Payment Status", "Paymented On",
+        "Payment By", "Transaction ID"
+    ]
     
-    return render(request,'employee/employee_dashboard.html',final_data) 
+    # Create an Excel workbook and sheet
+    workbook = openpyxl.Workbook()
+    sheet = workbook.active
+    sheet.title = 'Enrollment Data'
+
+    # Write headers to the Excel sheet
+    for col_num, header in enumerate(headers, 1):
+        sheet.cell(row=1, column=col_num, value=header).font = Font(bold=True)
+
+    # Write data rows for each student
+    for row_num, student in enumerate(student_enrollment_details, 2):
+        data = [
+            student["first_name"],
+            student["last_name"],
+            student["email"],
+            student["mobile"],
+            student["location"],
+            student["mode_of_attending"],
+            student["qualification"],
+            student["branch"],
+            student["course_name"],
+            student["course_amount"],
+            student["discount_amount"],
+            student["total_amount"],
+            student["gender"],
+            student["education_status"],
+            student["passed_year"],
+            student["marks"],
+            student["current_year"],
+            student["enrolled_on"],
+            student["enrollment_id"],
+            student["registration_fee"],
+            student["payment_mode"],
+            student["register_payment_status"],
+            student["paymented_on"],
+            student["payment_by"],
+            student["transaction_id"]
+        ]
+        
+        for col_num, cell_value in enumerate(data, 1):
+            sheet.cell(row=row_num, column=col_num, value=cell_value)
+
+    # Set the filename for the Excel file
+    filename = 'Filtered_Enrollment_Data.xlsx' if course_name_filter or date_filter else 'Unfiltered_Enrollment_Data.xlsx'
+
+    # Prepare the response with the content type for Excel
+    response = HttpResponse(
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+    response['Content-Disposition'] = f'attachment; filename={filename}'
+
+    # Save the workbook to the response
+    workbook.save(response)
+    return response
 
 
+
+# def download_excel(request):
+#     # Query to fetch the required data
+#     query = """
+#         SELECT se.first_name, se.last_name, se.email, se.mobile, se.location, 
+#                se.mode_of_attending, se.qualification, se.branch, se.course_name, 
+#                se.course_amount, se.discount_amount, se.total_amount, se.gender, 
+#                se.education_status, se.passed_year, se.marks, se.current_year, 
+#                se.enrolled_on, se.id AS enrolled_id, se.registration_fee,
+#                rp.payment_mode, rp.register_payment_status, rp.paymented_on, 
+#                rp.payment_by, rp.transaction_id 
+#         FROM counselor_app_studentenrollment se
+#         LEFT JOIN counselor_app_registrationpaymentdetails rp 
+#         ON se.id = rp.student_id
+#     """
+
+#     # Execute the query
+#     with connection.cursor() as cursor:
+#         cursor.execute(query)
+#         rows = cursor.fetchall()
+
+#     # Define headers
+#     headers = [
+#         "First Name", "Last Name", "Email", "Mobile", "Location", "Mode of Attending",
+#         "Qualification", "Branch", "Course Name", "Course Amount", "Discount Amount",
+#         "Total Amount", "Gender", "Education Status", "Passed Year", "Marks",
+#         "Current Year", "Enrolled On", "Enrolled ID", "Registration Fee", 
+#         "Payment Mode", "Register Payment Status", "Paymented On", 
+#         "Paymented By", "Transaction ID"
+#     ]
+
+#     # Create an Excel workbook and sheet
+#     workbook = openpyxl.Workbook()
+#     sheet = workbook.active
+#     sheet.title = 'Enrollment Data'
+
+#     # Write headers to Excel
+#     for col_num, header in enumerate(headers, 1):
+#         cell = sheet.cell(row=1, column=col_num, value=header)
+#         cell.font = Font(bold=True)  # Make header bold
+
+#     # Write data rows
+#     for row_num, row_data in enumerate(rows, 2):  # Start from second row
+#         for col_num, cell_value in enumerate(row_data, 1):
+#             sheet.cell(row=row_num, column=col_num, value=cell_value)
+
+#     # Set the response to download the Excel file
+#     response = HttpResponse(
+#         content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+#     )
+#     response['Content-Disposition'] = 'attachment; filename=Enrollment_Data.xlsx'
+#     workbook.save(response)
+#     return response
 
 def employee_logout(request):
     emp_id = request.session.get('emp_role_id')
@@ -130,43 +565,187 @@ def manager_login(request):
 
     return render(request, 'manager/manager_login.html')
 
+# def manager_dashboard_page(request):
+#     manager_id = request.session.get('manager_id')
+#     print(manager_id)
+#     if not manager_id:
+#         return render(request,'manager/manager_login.html')
+
+#     with connection.cursor() as cur:
+#         manager_query = "SELECT name,email,employee_id FROM counselor_app_manager WHERE id = %s"
+#         cur.execute(manager_query,[manager_id])
+#         manager_data = cur.fetchone()
+
+#         # employee_query = "SELECT name, email,role_type FROM counselor_app_role WHERE manager_id = %s"
+#         # cur.execute(employee_query,[manager_id])
+        
+#         # employee_data = cur.fetchall()
+        
+#     if manager_data:
+#         manager_details={
+#             "manager_name":manager_data[0],
+#             "manager_email":manager_data[1],
+#             "manager_empid":manager_data[2]
+#         }if manager_data else {}
+
+#     with connection.cursor() as cur:
+#         employee_query = "SELECT name, email, role_type FROM counselor_app_role WHERE manager_id = %s"
+#         cur.execute(employee_query, [manager_id])
+#         employee_data = cur.fetchall()
+#     employee_list = [{"name": employee[0], "email": employee[1]} for employee in employee_data]
+
+#     with connection.cursor() as cur:
+#         student_query = """
+#         SELECT s.first_name, s.last_name, s.enrollment_id, s.email, s.mobile, s.enrolled_on, c.name
+#         FROM counselor_app_studentenrollment AS s
+#         JOIN counselor_app_role AS c ON s.counselor_id = c.id
+#         WHERE c.manager_id = %s AND c.role_type = 'counselor'
+#         """
+#         cur.execute(student_query, [manager_id])
+#         student_data = cur.fetchall()
+
+#     student_list = [{
+#         "s_no": sno + 1,
+#         "first_name": student[0],
+#         "last_name": student[1],
+#         "enrollment_id": student[2],
+#         "email": student[3],
+#         "mobile": student[4],
+#         "enrolled_on":student[5],
+#         "counselor_name": student[6]
+#     } for sno, student in enumerate(student_data)]
+#     student_enrolled_count = len(student_list)
+
+#     with connection.cursor() as cur:
+#         course_count_query = """
+#         SELECT c.name AS course_name, COUNT(s.enrollment_id) AS enrollment_count
+#         FROM counselor_app_studentenrollment AS s
+#         JOIN counselor_app_role AS c ON s.counselor_id = c.id
+#         WHERE c.manager_id = %s AND c.role_type = 'counselor'
+#         GROUP BY c.name
+#         """
+#         cur.execute(course_count_query, [manager_id])
+#         course_data = cur.fetchall()
+
+#     course_countss = {course[0]: course[1] for course in course_data}
+#     print(course_countss)
+#     # print(course_counts)
+
+#     course_counts = {
+#         "Python": 30,
+#         "JavaScript": 20,
+#         "Data Science": 15,
+#         "Digital Marketing": 10,
+#         "UI/UX": 5
+#     }
+
+#     course_labels = list(course_counts.keys())
+#     course_data = list(course_counts.values())
+
+    
+
+#     return render(request,'manager/manager_dashboard.html',
+#         {'manager_details':manager_details,
+#         'employee_list': employee_list,
+#         'student_list': student_list,
+#         'student_enrolled_count': student_enrolled_count,
+#         'course_labels': course_labels,
+#         'course_data': course_data}
+#         )
+
 def manager_dashboard_page(request):
     manager_id = request.session.get('manager_id')
     print(manager_id)
     if not manager_id:
-        return render(request,'manager/manager_login.html')
+        return render(request, 'manager/manager_login.html')
 
     with connection.cursor() as cur:
         manager_query = "SELECT name,email,employee_id FROM counselor_app_manager WHERE id = %s"
-        cur.execute(manager_query,[manager_id])
+        cur.execute(manager_query, [manager_id])
         manager_data = cur.fetchone()
 
-        # employee_query = "SELECT name, email,role_type FROM counselor_app_role WHERE manager_id = %s"
-        # cur.execute(employee_query,[manager_id])
-        
-        # employee_data = cur.fetchall()
-        
     if manager_data:
-        manager_details={
-            "manager_name":manager_data[0],
-            "manager_email":manager_data[1],
-            "manager_empid":manager_data[2]
-        }if manager_data else {}
+        manager_details = {
+            "manager_name": manager_data[0],
+            "manager_email": manager_data[1],
+            "manager_empid": manager_data[2]
+        }
 
-    with connection.cursor() as cur:
-        employee_query = "SELECT name, email, role_type FROM counselor_app_role WHERE manager_id = %s"
-        cur.execute(employee_query, [manager_id])
-        employee_data = cur.fetchall()
-    employee_list = [{"name": employee[0], "email": employee[1]} for employee in employee_data]
+    # Get filtering parameters from POST
+    course_name_filter = request.POST.get('course_name')
+    date_filter = request.POST.get('date_filter')
+    enrollment_id_filter = request.POST.get('enrollment_id')
+    counselor_name_filter = request.POST.get('counselor_name')
+    mobile_filter = request.POST.get('student_mobile')
+    email_filter = request.POST.get('student_email')
 
-    with connection.cursor() as cur:
-        student_query = """
+    # Build the student query with filters
+    student_query = """
         SELECT s.first_name, s.last_name, s.enrollment_id, s.email, s.mobile, s.enrolled_on, c.name
         FROM counselor_app_studentenrollment AS s
         JOIN counselor_app_role AS c ON s.counselor_id = c.id
         WHERE c.manager_id = %s AND c.role_type = 'counselor'
-        """
-        cur.execute(student_query, [manager_id])
+    """
+    params = [manager_id]
+
+    # Filter by course name
+    if course_name_filter:
+        student_query += " AND s.course_name = %s"
+        params.append(course_name_filter)
+
+    # Filter by enrollment ID
+    if enrollment_id_filter:
+        student_query += " AND s.enrollment_id LIKE %s"
+        params.append(f"%{enrollment_id_filter}%")
+
+    # Filter by counselor name
+    if counselor_name_filter:
+        student_query += " AND c.name LIKE %s"
+        params.append(f"%{counselor_name_filter}%")
+
+    # Filter by mobile number
+    if mobile_filter:
+        student_query += " AND s.mobile LIKE %s"
+        params.append(f"%{mobile_filter}%")
+
+    # Filter by email
+    if email_filter:
+        student_query += " AND s.email LIKE %s"
+        params.append(f"%{email_filter}%")
+
+    # Apply date filter
+    today = datetime.now().date()
+    if date_filter:
+        if date_filter == 'today':
+            start_date, end_date = today, today + timedelta(days=1)
+        elif date_filter == 'yesterday':
+            start_date, end_date = today - timedelta(days=1), today
+        elif date_filter == 'last_3_days':
+            start_date = today - timedelta(days=3)
+        elif date_filter == 'last_7_days':
+            start_date = today - timedelta(days=7)
+        elif date_filter == 'last_month':
+            start_date = today - timedelta(days=30)
+        elif date_filter == 'custom_date':
+            start_date = request.POST.get('start_date')
+            end_date = request.POST.get('end_date')
+            if start_date and end_date:
+                start_date = datetime.strptime(start_date, "%Y-%m-%d").date()
+                end_date = datetime.strptime(end_date, "%Y-%m-%d").date() + timedelta(days=1)
+            else:
+                messages.error(request, "Please provide both start and end dates for custom date filter.")
+                return render(request, 'manager/manager_dashboard.html', {'manager_details': manager_details})
+
+        if start_date:
+            student_query += " AND s.enrolled_on >= %s"
+            params.append(start_date)
+        if end_date:
+            student_query += " AND s.enrolled_on < %s"
+            params.append(end_date)
+
+    # Execute the query for filtered student data
+    with connection.cursor() as cur:
+        cur.execute(student_query, params)
         student_data = cur.fetchall()
 
     student_list = [{
@@ -176,48 +755,46 @@ def manager_dashboard_page(request):
         "enrollment_id": student[2],
         "email": student[3],
         "mobile": student[4],
-        "enrolled_on":student[5],
+        "enrolled_on": student[5],
         "counselor_name": student[6]
     } for sno, student in enumerate(student_data)]
+
     student_enrolled_count = len(student_list)
 
+    # Fetch course count data
     with connection.cursor() as cur:
         course_count_query = """
-        SELECT c.name AS course_name, COUNT(s.enrollment_id) AS enrollment_count
-    FROM counselor_app_studentenrollment AS s
-    JOIN counselor_app_role AS c ON s.counselor_id = c.id
-    WHERE c.manager_id = %s AND c.role_type = 'counselor'
-    GROUP BY c.name
+            SELECT c.name AS course_name, COUNT(s.enrollment_id) AS enrollment_count
+            FROM counselor_app_studentenrollment AS s
+            JOIN counselor_app_role AS c ON s.counselor_id = c.id
+            WHERE c.manager_id = %s AND c.role_type = 'counselor'
+            GROUP BY c.name
         """
         cur.execute(course_count_query, [manager_id])
         course_data = cur.fetchall()
 
     course_countss = {course[0]: course[1] for course in course_data}
     print(course_countss)
-    # print(course_counts)
 
-    course_counts = {
-        "Python": 30,
-        "JavaScript": 20,
-        "Data Science": 15,
-        "Digital Marketing": 10,
-        "UI/UX": 5
-    }
+    # Generate course data for the chart (could be based on actual data)
+    course_counts = course_countss
 
     course_labels = list(course_counts.keys())
     course_data = list(course_counts.values())
 
-    
-
-    return render(request,'manager/manager_dashboard.html',
-        {'manager_details':manager_details,
-        'employee_list': employee_list,
+    return render(request, 'manager/manager_dashboard.html', {
+        'manager_details': manager_details,
         'student_list': student_list,
         'student_enrolled_count': student_enrolled_count,
         'course_labels': course_labels,
-        'course_data': course_data}
-        )
-
+        'course_data': course_data,
+        'course_name_filter': course_name_filter,
+        'date_filter': date_filter,
+        'enrollment_id_filter': enrollment_id_filter,
+        'counselor_name_filter': counselor_name_filter,
+        'mobile_filter': mobile_filter,
+        'email_filter': email_filter
+    })
 def add_role(request):
     manager_id = request.session.get('manager_id')
     if not manager_id:
@@ -317,8 +894,9 @@ def add_enroll_students(request):
         passed_year = request.POST.get('passed_year')
         marks = request.POST.get('marks')
         current_year = request.POST.get('current_year')
-        enrolled_on = datetime.datetime.now()
+        enrolled_on = datetime.now()
         enrollment_id = generate_enrollment_id(course_name, enrolled_on)
+        registration_fee = request.POST.get('registration_fee')
 
         with connection.cursor() as cur:
             # Fetch manager ID
@@ -367,15 +945,16 @@ def add_enroll_students(request):
                     (first_name, last_name, email, mobile, location, mode_of_attending, qualification,
                         branch, course_name, course_amount, discount_amount, total_amount, gender,
                         education_status, passed_year, marks, current_year, enrolled_on, enrollment_id,
-                        manager_id, counselor_id) VALUES 
-                    (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        manager_id, counselor_id, registration_fee, status) VALUES 
+                    (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,%s)
                 """
                 cur.execute(student_query, [
                     first_name, last_name, email, mobile, location, mode_of_attending,
                     qualification, branch, course_name, course_amount, discount_amount,
                     total_amount, gender, education_status, passed_year, marks,
-                    current_year, enrolled_on, enrollment_id, manager_id, emp_id
-                ])
+                    current_year, enrolled_on, enrollment_id, manager_id, emp_id,
+                    registration_fee,1  # Explicitly setting the payment status
+                    ])
 
             messages.success(request, "Student enrolled successfully!")
             return redirect('employee_dashboard_page')
@@ -496,6 +1075,7 @@ def view_enrolled_student(request, student_id):
     if not emp_id:
         return redirect('employee_login')
     student_details = {}
+    print(student_details)
 
     with connection.cursor() as cur:
         query ="""SELECT 
@@ -508,6 +1088,7 @@ def view_enrolled_student(request, student_id):
         student_data=cur.fetchone()
         if student_data:
             student_details = {
+
                 'first_name': student_data[0],
                 'last_name': student_data[1],
                 'email': student_data[2],
@@ -526,7 +1107,99 @@ def view_enrolled_student(request, student_id):
                 'marks': student_data[15],
                 'current_year': student_data[16],
                 'enrolled_on': student_data[17],
-            }
+                }
+            print(student_details)
+
         return render(request, 'student/view_enrolled_student.html', {'student': student_details})
-def payment_enrolled_student(request, student_id):
-    return HttpResponse(request,student_id)
+
+razorpay_client = razorpay.Client(auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_SECRET))
+
+
+def register_payment_enrolled_student(request, student_id):
+    emp_id = request.session.get('emp_role_id')
+    if not emp_id:
+        return redirect('employee_login')
+
+    # Initialize default values for the context variables
+    student_name = ""
+    course_name = ""
+    registration_fee = 0
+    total_amount = 0
+    manager_name = ""
+    counselor_name = ""
+    enrollment_id = ""
+
+    with connection.cursor() as cur:
+        # Fetch student data
+        cur.execute(""" 
+            SELECT first_name, last_name, enrollment_id, course_name, total_amount, registration_fee, manager_id 
+            FROM counselor_app_studentenrollment 
+            WHERE id = %s 
+        """, [student_id])
+        student_data = cur.fetchone()
+
+        # Populate context variables if student_data is not None
+        if student_data:
+            student_name = f"{student_data[0]} {student_data[1]}"
+            enrollment_id = student_data[2]  # Correctly fetch enrollment_id
+            course_name = student_data[3]
+            total_amount = student_data[4]
+            registration_fee = student_data[5]
+            manager_id = student_data[6]  # Remove the trailing comma
+
+            # Fetch manager details if manager_id is valid
+            if manager_id:
+                cur.execute("SELECT id, name FROM counselor_app_manager WHERE id = %s", [manager_id])
+                manager_data = cur.fetchone()
+                if manager_data:
+                    manager_name = manager_data[1]
+
+            # Fetch counselor details if emp_id is valid
+            if emp_id:
+                cur.execute("SELECT id, name FROM counselor_app_role WHERE id = %s", [emp_id])
+                counselor_data = cur.fetchone()
+                if counselor_data:
+                    counselor_name = counselor_data[1]
+
+    # Define context with all necessary data for the template
+    context = {
+        'student_id': student_id,
+        'student_name': student_name,
+        'course_name': course_name,
+        'registration_fee': registration_fee,
+        'total_amount': total_amount,
+        'manager_name': manager_name,
+        'counselor_name': counselor_name,
+    }
+
+    if request.method == 'POST':
+        payment_mode = request.POST.get('payment_mode')
+        print(payment_mode)  # Debug print
+
+        # Insert payment details into RegistrationPaymentDetails using raw SQL
+        with connection.cursor() as cur:
+            cur.execute("""
+                INSERT INTO counselor_app_registrationpaymentdetails (manager_id, counselor_id, student_id, 
+                student_name, enrollment_id, course_name, payment_mode, register_payment_status, 
+                paymented_on, payment_by, transaction_id, register_amount, status) 
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """, [
+                manager_id,
+                emp_id,
+                student_id,
+                student_name,
+                enrollment_id,  # Use the fetched enrollment_id
+                course_name,
+                payment_mode,
+                'success',
+                timezone.now(),  # Current timestamp
+                counselor_name,  # Or set it as needed
+                "",  # Empty transaction_id for offline payments
+                registration_fee,
+                1  # Status set to 1
+            ])
+
+        # Redirect to a success page or wherever appropriate
+        return redirect('employee_dashboard_page')  # Change to the actual success page
+
+    return render(request, 'student/register_payment.html', context)

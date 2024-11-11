@@ -27,6 +27,9 @@ DEBUG = True
 
 ALLOWED_HOSTS = []
 
+RAZORPAY_KEY_ID = "rzp_test_P995rx6r22Xdv9"
+RAZORPAY_SECRET = "Qw4zLootovECKFU5eqOK3p0q"
+
 
 # Application definition
 

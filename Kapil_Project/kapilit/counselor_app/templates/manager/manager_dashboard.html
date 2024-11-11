@@ -13,6 +13,42 @@
 	<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 	<title>Kapil IT Hub</title>
+
+	<style>
+        /* Style for the search icon */
+        .search-icon-container {
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+        }
+
+        .search-icon-container i {
+            font-size: 20px;
+            margin-right: 5px;
+        }
+
+        /* Style for the filter container */
+        #filter-container {
+            margin-top: 20px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+        }
+
+        /* Style for each filter field */
+        .filter-field {
+            margin-bottom: 10px;
+        }
+
+        .filter-field input, .filter-field select {
+            width: 100%;
+            padding: 8px;
+            margin: 5px 0;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+    </style>
 </head>
 <body>
 	<section id="sidebar">
@@ -139,14 +175,86 @@
 				</li>
 			</ul>
 
-
+<!-- <div class="search-icon-container">
+        <i class="fa fa-search" id="search-icon" onclick="toggleFilters()"></i>
+        <span>Search</span>
+    </div> -->
 			<div class="table-data">
 				<div class="order">
 					<div class="head">
 						<h3>Recent Enrollments</h3>
-						<i class='bx bx-search' ></i>
-						<i class='bx bx-filter' ></i>
+						<div class="icon-container">
+                            <i class="fa fa-search fa-xl" style="color: #1259d3; cursor: pointer;" id="search-icon" onclick="toggleFilters()"></i>
+							<i class="fa fa-times fa-xl" style="color: #d32f2f; cursor: pointer; display: none;" id="remove-filter-icon" onclick="removeFilter()"></i>
+							<i class="fa fa-refresh fa-xl" style="color: #28a745; cursor: pointer; display: none;" id="refresh-icon" onclick="refreshPage()"></i>
+                        </div>		
 					</div>
+					<div class="filter-section" id="filter-section" style="display: none;">
+    <form method="POST" action="{% url 'manager_dashboard_page' %}" onsubmit="showFilteredData()">
+        {% csrf_token %}
+        <div class="row mb-3">
+            <!-- Course Filter -->
+            <div class="col">
+                <select class="form-select" name="course_name">
+                    <option value="">Select Course</option>
+                    <option value="Python Full Stack">Python Full Stack</option>
+                    <option value="Java Full Stack">Java Full Stack</option>
+                    <option value="Data Science">Data Science</option>
+                    <option value="Digital Marketing">Digital Marketing</option>
+                    <option value="UI/UX">UI/UX</option>
+                </select>
+            </div>
+            <!-- Date Range Filter -->
+            <div class="col">
+                <select class="form-select" name="date_filter" id="date_filter" onchange="toggleCustomDate()">
+                    <option value="">Select Date Range</option>
+                    <option value="today">Today</option>
+                    <option value="yesterday">Yesterday</option>
+                    <option value="last_3_days">Last 3 Days</option>
+                    <option value="last_7_days">Last 7 Days</option>
+                    <option value="last_month">Last Month</option>
+                    <option value="custom_date">Custom Date Range</option>
+                </select>
+            </div>
+            <!-- Filter Button -->
+            <div class="col">
+                <button type="submit" class="btn btn-primary">Filter</button>
+            </div>
+        </div>
+        <div class="row mb-3" id="custom-date" style="display: none;">
+            <!-- Custom Date Range -->
+            <div class="col">
+                <input type="date" name="start_date" class="form-control" placeholder="Start Date">
+            </div>
+            <div class="col">
+                <input type="date" name="end_date" class="form-control" placeholder="End Date">
+            </div>
+        </div>
+
+        <!-- Additional Filters: Name, Enrollment ID, Counselor, Email, Mobile -->
+        <div class="row mb-3">
+            <div class="col">
+                <input type="text" class="form-control" name="student_name" placeholder="Student Name">
+            </div>
+            <div class="col">
+                <input type="text" class="form-control" name="enrollment_id" placeholder="Enrollment ID">
+            </div>
+            <div class="col">
+                <input type="text" class="form-control" name="counselor_name" placeholder="Counselor Name">
+            </div>
+        </div>
+        <div class="row mb-3">
+            <div class="col">
+                <input type="email" class="form-control" name="student_email" placeholder="Email">
+            </div>
+            <div class="col">
+                <input type="text" class="form-control" name="student_mobile" placeholder="Mobile">
+            </div>
+        </div>
+    </form>
+</div>
+
+
 					<table>
 						<thead>
 							<tr>
@@ -321,6 +429,56 @@
             toggleChart();
         };
     </script>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js"></script>
+	<script>
+		// Toggle the dropdown menu
+		document.getElementById("studentsMenu").addEventListener("click", function() {
+			const dropdown = document.getElementById("studentsDropdown");
+			// Toggle the visibility of the dropdown
+			if (dropdown.style.display === "none" || dropdown.style.display === "") {
+				dropdown.style.display = "block";
+			} else {
+				dropdown.style.display = "none";
+			}
+		});
+	</script>
+
+	<script>
+		// JavaScript function to toggle the display of the filter section
+		function toggleFilters() {
+			const filterSection = document.getElementById('filter-section');
+			filterSection.style.display = filterSection.style.display === 'none' ? 'block' : 'none';
+			document.getElementById('search-icon').style.display = 'none';
+			document.getElementById('remove-filter-icon').style.display = 'inline-block';
+			document.getElementById('refresh-icon').style.display = 'inline-block';
+		}
+
+		// Remove the filter
+		function removeFilter() {
+			document.getElementById('filter-section').style.display = 'none';
+			document.getElementById('search-icon').style.display = 'inline-block';
+			document.getElementById('remove-filter-icon').style.display = 'none';
+			document.getElementById('refresh-icon').style.display = 'none';
+		}
+
+		// Reload the page
+		function refreshPage() {
+			location.reload();
+		}
+
+		// Show filtered data
+		function showFilteredData() {
+			// Implement your data filtering logic here.
+		}
+
+		// Show custom date input when custom date is selected
+		function toggleCustomDate() {
+			const customDateInput = document.getElementById('custom-date');
+			const dateFilter = document.getElementById('date_filter');
+			customDateInput.style.display = dateFilter.value === 'custom_date' ? 'block' : 'none';
+		}
+	</script>
 
 
 </body>
